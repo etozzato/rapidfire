@@ -4,7 +4,7 @@
 
 One stop solution for all survey related requirements! Its tad easy!
 
-This gem supports **rails 3.2.13+**, **rails4** and **rails5** versions.
+This gem supports **rails 4.2.0+**, **rails 5** and **rails 6** with **ruby 2.4** and later.
 
 You can see a demo of this gem [here](https://rapidfire.herokuapp.com).
 And the source code of demo [here](https://github.com/code-mancers/rapidfire-demo).
@@ -48,6 +48,7 @@ methods `current_user` and `can_administer?` on your `ApplicationController`
 1. `current_user` : the user who is answering the survey. can be `nil`
 2. `can_administer?` : a method which determines whether current user can
    create/update survey questions.
+3. `owner_surveys_scope` : the scope of surveys for this entity, if you want to have multi-tenancy. Defaults to `Survey`
 
 Typical implementation would be:
 
@@ -60,6 +61,22 @@ Typical implementation would be:
     def can_administer?
       current_user.try(:admin?)
     end
+
+    def owner_surveys_scope
+      current_user.surveys
+    end
+  end
+```
+
+It also will assume that whatever `current_user` returns above will respond to a method called `survey_name`.
+
+That method should return the name you want associated with the results. For example:
+
+```rb
+  class User
+    def survey_name
+      "#{last_name}, #{first_name}"
+    end
   end
 ```
 
@@ -71,8 +88,8 @@ and you don't have to define it.
 Override path to redirect after answer the survey
 
 ```ruby
-# my_app/app/decorators/controllers/rapidfire/answer_groups_controller_decorator.rb
-Rapidfire::AnswerGroupsController.class_eval do
+# my_app/app/decorators/controllers/rapidfire/attempts_controller_decorator.rb
+Rapidfire::AttemptsController.class_eval do
   def after_answer_path_for
     main_app.root_path
   end
@@ -94,6 +111,27 @@ You can see them by running `bundle exec rake routes`.
 
    You can distribute this url so that survey takers can answer a particular survey
    of your interest.
+3. If you have an established application that uses route helpers and/or the
+   `url_for([@model1, @model2])` style, you can include your route helpers in
+   RapidFire by adding `config/initializers/rapidfire.rb` with the
+   following content:
+
+   ```ruby
+   Rails.application.config.after_initialize do
+     Rails.application.reload_routes!
+
+     Rapidfire::ApplicationController.class_eval do
+       main_app_methods = Rails.application.routes.url_helpers.methods
+       main_app_route_methods = main_app_methods.select{|m| m =~ /_url$/ || m =~ /_path$/ }
+       main_app_route_methods.each do |m|
+         define_method m do |*args|
+           main_app.public_send(m, *args)
+         end
+         helper_method m
+       end
+     end
+   end
+   ```
 
 ### Survey Results
 A new api is released which helps in seeing results for each survey. The api is:
@@ -209,6 +247,10 @@ The typical flow about how to use this gem is:
 
 
 ## Notes on upgrading
+##### Adding multitenancy support
+```shell
+    $ rake rapidfire:upgrade:migrations:multitenancy
+```
 
 ##### Upgrading from 2.1.0 to 3.0.0
 
@@ -253,7 +295,6 @@ delimiter will be hardcoded to `\r\n`:
 
 ## TODO
 1. Add ability to sort questions, so that order is preserved.
-2. Add multi tenant support.
 
 ## Contributing
 

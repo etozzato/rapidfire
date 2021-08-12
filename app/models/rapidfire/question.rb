@@ -6,11 +6,8 @@ module Rapidfire
     default_scope { order(:position) }
 
     validates :survey, :question_text, :presence => true
+    validate :type_can_change
     serialize :validation_rules
-
-    if Rails::VERSION::MAJOR == 3
-      attr_accessible :survey, :question_text, :position, :default_text, :placeholder, :validation_rules, :answer_options
-    end
 
     def self.inherited(child)
       child.instance_eval do
@@ -38,6 +35,12 @@ module Rapidfire
         min_max[:maximum] = rules[:maximum].to_i if rules[:maximum].present?
 
         answer.validates_length_of :answer_text, min_max
+      end
+    end
+
+    def type_can_change
+      if type_changed? && answers.any?
+        errors.add(:type, "cannot change after answers have been added")
       end
     end
   end
